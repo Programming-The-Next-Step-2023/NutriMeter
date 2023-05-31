@@ -1,8 +1,5 @@
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
-#
-#install.packages("janitor")
-
 
 #read.csv("gpt_food_nutrient.csv", stringsAsFactors = FALSE)
 #setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
@@ -10,66 +7,47 @@
 
 
 #'@import shiny
+#'@import shinythemes
+#'@import shinyWidgets
 #'@import usethis
 #'@import dplyr
-#'@import shinyWidgets
+#'@import tidyr
 
-
-# ui = fluidPage(
-#   column(4,
-#          numericInput("x", "Value", 5),
-#          br(),
-#          actionButton("button", "Show")
-#   ),
-#   column(8, tableOutput("table"))
-# )
-# server = function(input, output) {
-#   # Take an action every time button is pressed;
-#   # here, we just print a message to the console
-#   observeEvent(input$button, {
-#     cat("Showing", input$x, "rows\n")
-#   })
-#   # The observeEvent() above is equivalent to:
-#   # observe({
-#   #    cat("Showing", input$x, "rows\n")
-#   #   }) %>%
-#   #   bindEvent(input$button)
-#
-#   # Take a reactive dependency on input$button, but
-#   # not on any of the stuff inside the function
-#   df <- eventReactive(input$button, {
-#     head(cars, input$x)
-#   })
-#   output$table <- renderTable({
-#     df()
-#   })
-# }
-#
 
 #load("./data/gpt_food_nutrient.rda")
 
 # UI
 ui <- fluidPage(
-  # titlePanel("Nutrition Tracker"),
+  shinythemes::themeSelector(),
+  titlePanel("NutriMeter"),
+  br(),
   sidebarLayout(
     sidebarPanel(
-      # numericInput("x", "Value", 5),
-      # actionButton("button", "Show"),
+      h3("About you"),
+      br(),
       numericInput("age", "Age:", 18, min = 9, max = 120, step = 1),
       selectInput("gender", "Gender", choices = c("Female","Male")),
-      textInput("food", "Food", placeholder = "Enter food name"),
-        # checkBoxGroupInout
+      br(),
+      h3("Add a food to your food diary"),
+      br(),
+      selectizeInput(
+        "food",
+        "Food",
+        choices = NULL,
+        options = list(liveSearch = TRUE)
+      ),
+      # textInput("food", "Food", placeholder = "Enter food name"),
       numericInput("amount", "Amount", value = 100, min = 0),
       selectInput("unit", "Unit", choices = c("g", "ml"), selected = "g"),
-      actionButton("log_food", "Log Food")
+      actionButton("submit", "Submit", class = "btn-success")
     ),
     mainPanel(
-      # tableOutput("table"),
-      tableOutput("table2")
-    #   h3("Food Diary"),
-    #   tableOutput("food_table"),
-    #   h3("Nutrition Progress"),
-    #   uiOutput("progress_bars")
+      h3("Today's Food Diary"),
+      tableOutput("table1"),
+      br(),
+      h3("Nutrient Progress"),
+      tableOutput("table2"),
+      uiOutput("progressBars")
     )
   )
 )
@@ -77,43 +55,28 @@ ui <- fluidPage(
 
 # Server
 server <- function(input, output, session) {
+  observe({
+    updateSelectizeInput(
+      session,
+      "food",
+      choices = unique(gpt_food_nutrient$food_name)
+    )
+  })
+  print(unique(gpt_food_nutrient$food_name))
   # Create logged food dataframe
   logged_food <- reactiveValues(data = data.frame(Food = character(),
                                                   Amount = numeric(),
                                                   Unit = character()))
-  # Add entered foods to logged_food
-  # observeEvent(input$button, {
-  #   cat("Showing", input$x, "rows\n")
-  # })
-  # The observeEvent() above is equivalent to:
-  # observe({
-  #    cat("Showing", input$x, "rows\n")
-  #   }) %>%
-  #   bindEvent(input$button)
 
-  # Take a reactive dependency on input$button, but
-  # not on any of the stuff inside the function
-  # df <- eventReactive(input$button, {
-  #   head(cars, input$x)
-  # })
-  # output$table <- renderTable({
-  #   df()
-  # })
-
-
-
-  nutrients_amount_df <- eventReactive(input$log_food, {
+  nutrients_amount_df <- eventReactive(input$submit, {
     # Prepare food data df with the correct RDAs
     food_data <-
       prep_data(input$age, input$gender)
-      print("updated")
-    print("hoi")
-    cat("fg")
     food <- input$food
     amount <- input$amount
     unit <- input$unit
 
-    print(food)
+    #print(food)
     if (!is.na(food) && amount > 0) {
       # Append the logged food to the data frame
       logged_food$data <- rbind(logged_food$data, data.frame(Food = food,
@@ -124,98 +87,27 @@ server <- function(input, output, session) {
       updateTextInput(session, "food", value = "")
       updateNumericInput(session, "amount", value = 100)
     }
-    print(str(food_data))
-    calculate_nutrients_amount(food_data, logged_food$data)
+    # print(str(food_data))
+    calculate_nutrients_amount(food_data, logged_food$data, input$age)
     #return(logged_food$data)
   })
-
+  output$table1 <- renderTable({
+    logged_food$data
+  })
   output$table2 <- renderTable({
     nutrients_amount_df()
   })
-
-
-
-
-  # Calculate how much raw amount of each nutrient has been consumed so far
-  #nutrients_amount_df <- reactive({calculate_nutrients_amount(food_data, logged_food$data)})
-
-
-
-  # For all food entries, calculate total percent of RDAs consumed for each nutrient
-
-
-
-
-  # Calculate RDA percentage for each nutrient
-  # if (FALSE) {
-  # nutrient_progress <- reactive({
-  #   get_nutrient_data(input$age, input$gender)
-  #
-  #   progress_df <- list()
-  #
-  #   unique_nutrients <- unique(food_data$nutrient)
-  #   for (i in 1:length(unique_nutrients)) {
-  #     nutrient <- unique_nutrients[i]
-  #     nutrient_rda <- food_data$RDA[food_data$nutrient == nutrient][1]
-  #     nutrient_content <- food_data$`nutrient content`[food_data$nutrient == nutrient][1]
-  #     nutrient_content_unit <- food_data$`nutrient content unit`[food_data$nutrient == nutrient][1]
-  #     nutrient_unit <- food_data$`RDA unit`[food_data$nutrient == nutrient][1]
-  #
-  #     nutrient_amount <- nutrient_amount()
-  #
-  #     if (nutrient_unit == "g" || nutrient_unit == "ml") {
-  #       # Scale nutrient content based on the user-entered amount
-  #       nutrient_amount <- nutrient_amount * nutrient_content * (input$amount / 100)
-  #     } else {
-  #       nutrient_amount <- 0
-  #     }
-  #
-  #     progress <- tryCatch({
-  #       percent <- min(nutrient_amount / nutrient_rda * 100, 100)  # Cap at 100%
-  #       round(percent, digits = 1)
-  #     }, error = function(e) {
-  #       0  # Set progress to 0 in case of error
-  #     })
-  #
-  #     progress_list[[i]] <- list(nutrient = nutrient, progress = progress)
-  #   }
-  #   return(progress_df)
-  # })
-  #
-  #
-  # # Display logged food in a table
-  # output$food_table <- renderTable({
-  #   logged_food$data
-  # })
-  #
-  # # Render progress bars
-  # output$progress_bars <- renderUI({
-  #   progress_bars <- lapply(nutrient_progress(), function(progress) {
-  #     nutrient <- progress$nutrient
-  #     percent <- progress$progress
-  #     progressBar(
-  #       id = paste0("progress_", nutrient),
-  #       value = percent,
-  #       total = 100,
-  #       display_pct = TRUE,
-  #       title = paste(nutrient, "(", percent, "%)")
-  #     )
-  #   })
-  #
-  #   tagList(progress_bars)
-  # })
-  #
-  # # ...
-  #
-  # # Update progress bars whenever logged food changes
-  # observe({
-  #   lapply(nutrient_progress(), function(progress) {
-  #     nutrient <- progress$nutrient
-  #     percent <- progress$progress
-  #     updateProgressBar(session, paste0("progress_", nutrient), value = percent)
-  #   })
-  # })
-  # }
+  output$progressBars <- renderUI({
+    progressBars <- lapply(seq_along(nutrients_amount_df()$Perc_RDA), function(i) {
+      nutrient_name <- nutrients_amount_df()$Nutrient[i]
+      percent_value <- round(nutrients_amount_df()$Perc_RDA[i], 1)
+      fluidRow(
+        column(12, h4(nutrient_name)),
+        column(12, progressBar(id = paste0("progress", i), value = percent_value, title = paste0(percent_value, "%")))
+      )
+    })
+    do.call(tagList, progressBars)
+  })
 }
 
 
@@ -223,6 +115,15 @@ server <- function(input, output, session) {
 
 ### HELPER FUNCTIONS
 
+#food_nutrient_dat <- read.csv("food_nutrient.csv")
+
+#data_path <- system.file("data", "food_nutrient.csv", package = "NutriMeter")
+
+# Read the CSV file into a dataframe
+# food_nutrient <- read.csv("food_nutrient.csv")
+
+
+## Prepare the data
 prep_data <- function(age = 18, gender = "Female") {
   # select the right RDA column
   RDA_col_pt1 <- switch(gender,
@@ -243,17 +144,16 @@ prep_data <- function(age = 18, gender = "Female") {
     gpt_food_nutrient[,RDA_col_name])
   colnames(food_data) <- c("food_name","quantity","nutrient","nutrient content","nutrient content unit","RDA unit","RDA")
   food_data[food_data == "µg"] <- "mcg"
-  food_data$nutrient <- sub("^\\s", "", food_data$nutrient)#delete spaces at beginning of nutrient names
+  food_data$nutrient <- sub("^\\s", "", food_data$nutrient) #delete spaces at beginning of nutrient names
 
   return(food_data)
 }
 
-#prep_data()
 
-# Calculate how much raw amount of each nutrient has been consumed so far
-calculate_nutrients_amount <- function(food_data, food_logged) {
+## Calculate how much raw amount of each nutrient has been consumed so far
+calculate_nutrients_amount <- function(food_data, food_logged, age) {
 
-  print(dput(food_logged))
+  # print(dput(food_logged))
   # make empty dataframe with one row per food entry, and one column per nutrient
   columns <- c("food","amount","unit",unique(food_data$nutrient))
   nutrient_amount <- data.frame(matrix(nrow = nrow(food_logged), ncol = length(columns)))
@@ -267,6 +167,8 @@ calculate_nutrients_amount <- function(food_data, food_logged) {
     nutrient_amount[i,3] <- food_logged$Unit[i]
     for (n in nutrients) {
       amount_per_100 <- food_data %>% filter(food_name == nutrient_amount[i,1], nutrient == n) %>% select(`nutrient content`) %>% pull()
+      print("amount_per_100")
+      print(amount_per_100)
       nutrient_amount[i,n] <- amount_per_100 * (nutrient_amount[i,2]/100)
     }}
   # sum the nutrient amounts over all foods
@@ -274,9 +176,49 @@ calculate_nutrients_amount <- function(food_data, food_logged) {
     select(4:ncol(nutrient_amount)) %>%
     add_row(!!!summarise(., across(where(is.numeric), ~ if(all(!is.na(.))) sum(., na.rm = TRUE) else NA))) %>%
     tail(n=1)
-  # return one row with total raw amounts of nutrients consumed
-  return(nutrient_amount)
+  # add a row with RDA values
+  nutrient_amount <- rbind(nutrient_amount,food_data[1:24,"RDA"])
+  # rename this one sus column
+  names(nutrient_amount)[names(nutrient_amount) == "Retinol  "] <- "Retinol"
+  nutrient_amount %>% rename(`Retinol  ` = Retinol)
+  # convert all to numeric
+  nutrient_amount <- nutrient_amount %>% mutate_all(as.numeric)
+  # add vitamin A column
+  nutrient_amount$`Vitamin A` <- NA
+  nutrient_amount$`Vitamin A`[1] <-
+      nutrient_amount$`Retinol activity equialents (RAE)`[1] +
+      nutrient_amount$`Retinol equivalents (RE)`[1] +
+      nutrient_amount$`Retinol`[1] +
+      (nutrient_amount$`Beta-carotene`[1]/12) +
+      (nutrient_amount$`Alfa-carotene`[1]/24) +
+      (nutrient_amount$`Beta-cryptoxanthin`[1]/24)
+  nutrient_amount$`Vitamin A`[2] <- ifelse(age <= 13, 600, 800)
+  # delete vitamin A component columns
+  columns_to_exclude <- c("Retinol activity equialents (RAE)",
+                          "Retinol equivalents (RE)",
+                          "Retinol", "Beta-carotene", "Beta-cryptoxanthin")
+  nutrient_amount <- nutrient_amount %>%
+      select(-one_of(columns_to_exclude))
+  # return df with raw amounts, RDA and % RDA
+  # print(as.vector(unlist((nutrient_amount[1,]))))
+  nutrient_amount_fin <- data.frame(
+      Nutrient = colnames(nutrient_amount),
+      Raw_Amount = as.vector(unlist(nutrient_amount[1,])),
+      RDA = as.vector(unlist(nutrient_amount[2,]))
+  )
+  nutrient_amount_fin <- nutrient_amount_fin %>%
+      mutate(Perc_RDA = Raw_Amount/RDA*100)
+
+  # nutrient_amount_fin$`Raw Amount` <- nutrient_amount[1,]
+      #Nutrient = colnames(nutrient_amount),
+      #`Raw Amount` = nutrient_amount[1,]
+      #RDA = nutrient_amount[2,],
+      #`% RDA` = NA
+  return(nutrient_amount_fin)
 }
+
+
+
 
 # if (FALSE) {
 # food_dat <- prep_data()
@@ -297,7 +239,10 @@ calculate_nutrients_amount <- function(food_data, food_logged) {
 #' @export
 #'
 runNutrimeterApp <- function() {
-  print(server)
+  #print(server)
   shinyApp(ui = ui, server = server)
 }
+
+
+
 
