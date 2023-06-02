@@ -1,16 +1,16 @@
 # This is a Shiny web application. You can run the application by clicking
 # the 'Run App' button above.
 
-#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-#getwd()
 
-
+# Imports
 #'@import shiny
 #'@import shinythemes
 #'@import shinyWidgets
 #'@import usethis
 #'@import dplyr
 #'@import testthat
+
+
 
 
 # UI
@@ -27,23 +27,15 @@ ui <- fluidPage(
     shiny::column(
       width = 12,
       div(
-        style = "background-color: #f5f5f5; padding: 10px; border: 1px solid #CCCCCC; border-radius: 5px;",
+        style = "background-color: #f5f5f5; padding: 10px; border: 1px solid
+        #CCCCCC; border-radius: 5px;",
         HTML("<h4 style='font-size: 18px;'>Welcome to Nutrimeter!</h4>
-             <p style='font-size: 16px;'>Log all the foods you eat today in your food diary and see your progress
-             on the Recommended Daily Allowance (RDA) of most essential nutrients!</p>
-             <p style='font-size: 16px;'>If you want to know which foods are good sources of nutrients, check out the App Vignette!</p>")
+             <p style='font-size: 16px;'>Log all the foods you eat today in your
+             food diary and see your progress on the Recommended Daily Allowance
+             (RDA) of most essential nutrients!</p> <p style='font-size: 16px;'
+             >If you want to know which foods are good sources of nutrients,
+             check out the App Vignette!</p>")
       )
-        # HTML("Welcome to Nutrimeter!<br>
-        #      Log all the foods you eat today in your food diary and see your progress
-        #      on the Recommended Daily Allowance (RDA) of most essential nutrients!<br>
-        #      If you want to know which foods are good sources of nutrients, check out the App Vignette!")
-      #)
-      # div(
-      #   style = "background-color: #f5f5f5; padding: 10px; border: 1px solid
-      #   #CCCCCC; border-radius: 5px;",
-      #   "Welcome to Nutrimeter! Log all the foods you eat today in your food diary,
-      #   and see your progress on the Recommended Daily Allowance (RDA) of most essential nutrients!"
-      # )
     )
   ),
   br(),
@@ -96,6 +88,7 @@ ui <- fluidPage(
 
 
 
+
 # Server
 server <- function(input, output, session) {
   observe({
@@ -105,18 +98,18 @@ server <- function(input, output, session) {
       choices = unique(food_nutrient_dat$food_name)
     )
   })
-  # Create logged food dataframe
+  # Create dataframe with logged foods
   logged_food <- reactiveValues(data = data.frame(Food = character(),
                                                   Amount = numeric(),
                                                   Unit = character()))
-
+  # Initalize empty food data df with the correct RDAs
   nutrients_amount_df <- eventReactive(input$submit, {
-    # Prepare food data df with the correct RDAs
     food_data <-
       prep_data(input$age, input$gender)
     food <- input$food
     amount <- input$amount
     unit <- input$unit
+
     if (!is.na(food) && amount > 0 && food != "") {
       # Append the logged food to the data frame
       logged_food$data <- rbind(logged_food$data, data.frame(Food = food,
@@ -128,23 +121,25 @@ server <- function(input, output, session) {
     }
     calculate_nutrients_amount(food_data, logged_food$data, input$age)
   })
+
+  ## Generate Outputs
+  # food diary
   output$table1 <- renderTable({
     logged_food$data
   })
-  # output$table2 <- renderTable({
-  #   nutrients_amount_df()
-  # })
+  # nutrient progress table
   output$table2 <- renderTable({
   create_output_nutrient_table(nutrients_amount_df(), food_data)
   })
+  # progress bars
   output$progressBars <- renderUI({
     progressBars <- lapply(seq_along(nutrients_amount_df()$Perc_RDA), function(i) {
       nutrient_name <- nutrients_amount_df()$Nutrient[i]
       percent_value <- round(nutrients_amount_df()$Perc_RDA[i], 1)
       fluidRow(
         column(10, h4(nutrient_name)),
-        #column(10, progressBar(id = paste0("progress", i), value = percent_value, title = paste0(percent_value, "%"), class = "my-progress-bar"))
-        column(10, progressBar(id = paste0("progress", i), value = percent_value, title = paste0(percent_value, "%")))
+        column(10, progressBar(id = paste0("progress", i), value = percent_value,
+                               title = paste0(percent_value, "%")))
       )
     })
     do.call(tagList, progressBars)
@@ -153,13 +148,28 @@ server <- function(input, output, session) {
 
 
 
+
+# Run App Function
+#' Run the Nutrimeter app
+#' @description
+#' Run this function to open the NutriMeter Shiny App! No arguments needed!
+#' @return
+#' @export
+#'
+runNutrimeterApp <- function() {
+  shinyApp(ui = ui, server = server)
+}
+
+
+#------------------------------------------------------------------------------
+
 ######   HELPER FUNCTIONS    ######
 
 
 ###  Prepare data
-
 prep_data <- function(age = 18, gender = "Female") {
-  # select the right RDA column
+
+  # select the correct RDA column based on age and gender
   RDA_col_pt1 <- switch(gender,
                         "Female" = "RDA_f_",
                         "Male" = "RDA_m_",
@@ -171,29 +181,29 @@ prep_data <- function(age = 18, gender = "Female") {
     else if (age >= 51 && age <= 70) {RDA_col_pt2 <- "51_70"}
     else {RDA_col_pt2 <- "71_150"}
   RDA_col_name <- paste(RDA_col_pt1,RDA_col_pt2,sep = "")
-
-  # make the food data dataframe
+  # make food data dataframe
   food_data <- cbind(
     food_nutrient_dat %>%
-      select(food_name, quantity, nutrient_name, nutrient_content, unit_content, RDA_unit), # except vit k
+      select(food_name, quantity, nutrient_name, nutrient_content, unit_content,
+             RDA_unit), # except vit k
       food_nutrient_dat[,RDA_col_name]) %>%
       filter(nutrient_name != " Vitamin K total")
-  colnames(food_data) <- c("food_name","quantity","nutrient","nutrient content","nutrient content unit","RDA unit","RDA")
+  colnames(food_data) <- c("food_name","quantity","nutrient","nutrient content",
+                           "nutrient content unit","RDA unit","RDA")
   food_data[food_data == "µg"] <- "mcg"
-  food_data$nutrient <- sub("^\\s", "", food_data$nutrient) #delete spaces at beginning of nutrient names
+  #delete spaces at beginning of nutrient names
+  food_data$nutrient <- sub("^\\s", "", food_data$nutrient)
   return(food_data)
 }
 
 
 
-###  Calculate how much raw amount of each nutrient has been consumed so far
-
+###  Calculate raw amounts and %RDA of nutrients consumed
 calculate_nutrients_amount <- function(food_data, food_logged, age) {
-  #save(food_data, food_logged, age, file = "~/Desktop/debug.RData")
-  #load(file = "~/Desktop/debug.RData")
+
   # make empty dataframe with one row per food entry, and one column per nutrient
   columns <- c("food","amount","unit",unique(food_data$nutrient))
-  nutrient_amount <- data.frame(matrix(nrow = nrow(food_logged), ncol = length(columns)))
+  nutrient_amount <- data.frame(matrix(nrow = nrow(food_logged),ncol=length(columns)))
   colnames(nutrient_amount) <- columns
   nutrients <- unique(food_data$nutrient)
 
@@ -203,7 +213,9 @@ calculate_nutrients_amount <- function(food_data, food_logged, age) {
     nutrient_amount[i,2] <- food_logged$Amount[i]
     nutrient_amount[i,3] <- food_logged$Unit[i]
     for (n in nutrients) {
-      amount_per_100 <- food_data %>% filter(food_name == nutrient_amount[i,1], nutrient == n) %>% select(`nutrient content`) %>% pull()
+      amount_per_100 <- food_data %>%
+        filter(food_name == nutrient_amount[i,1],
+               nutrient == n) %>% select(`nutrient content`) %>% pull()
       if(is.numeric(amount_per_100) && length(amount_per_100) == 0){
         nutrient_amount[i,n] <- 0
       } else {
@@ -213,7 +225,8 @@ calculate_nutrients_amount <- function(food_data, food_logged, age) {
   # sum the nutrient amounts over all foods
   nutrient_amount <- nutrient_amount %>%
     select(4:ncol(nutrient_amount)) %>%
-    add_row(!!!summarise(., across(where(is.numeric), ~ if(all(!is.na(.))) sum(., na.rm = TRUE) else NA))) %>%
+    add_row(!!!summarise(., across(where(is.numeric), ~ if(all(!is.na(.)))
+      sum(., na.rm = TRUE) else NA))) %>%
     tail(n=1)
   # add a row with RDA values
   nutrient_amount <- rbind(nutrient_amount,food_data[1:24,"RDA"])
@@ -242,8 +255,7 @@ calculate_nutrients_amount <- function(food_data, food_logged, age) {
   nutrient_amount_fin <- data.frame(
       Nutrient = colnames(nutrient_amount),
       Raw_Amount = as.vector(unlist(nutrient_amount[1,])),
-      RDA = as.vector(unlist(nutrient_amount[2,]))
-  )
+      RDA = as.vector(unlist(nutrient_amount[2,])))
   nutrient_amount_fin <- nutrient_amount_fin %>%
       mutate(Perc_RDA = Raw_Amount/RDA*100)
   custom_order <- c("Vitamin A", "Thiamin (Vit B1)", "Riboflavin (Vit B2)",
@@ -251,10 +263,11 @@ calculate_nutrients_amount <- function(food_data, food_logged, age) {
     "Ascorbic acid (Vit C)", "Vitamin D total", "Vitamin E total",
     "Dietary folate equivalents", "Calcium", "Copper", "Iodine", "Iron total",
     "Magnesium", "Phosphorus", "Potassium", "Selenium total", "Zinc")
-  nutrient_amount_fin <- nutrient_amount_fin[match(custom_order, nutrient_amount_fin$Nutrient),]
-  print(head(nutrient_amount_fin))
+  nutrient_amount_fin <- nutrient_amount_fin[match(custom_order,
+                                            nutrient_amount_fin$Nutrient),]
   return(nutrient_amount_fin)
 }
+
 
 
 ### Make the nutrient table pretty for the UI
@@ -264,20 +277,9 @@ create_output_nutrient_table <- function(ugly_table, food_data) {
       nice_table$Raw_Amount <- format(round(nice_table$Raw_Amount), nsmall = 0)
       nice_table$RDA <- format(round(nice_table$RDA), nsmall = 0)
      colnames(nice_table) <- c("Nutrient", "Consumed Amount", "RDA Target Amount")
-     nice_table$Unit <- c("mcg","mg","mg","mg","mg","mcg","mg","mcg","mg","mcg","mg", #last one Calcium
-                          "mg","mcg","mg","mg","mg","mg","mcg","mg")
+     nice_table$Unit <- c("mcg","mg","mg","mg","mg","mcg","mg","mcg","mg","mcg",
+                          "mg","mg","mcg","mg","mg","mg","mg","mcg","mg")
      return(nice_table)
-}
-
-
-
-#' Run the Nutrimeter app
-#'
-#' @return
-#' @export
-#'
-runNutrimeterApp <- function() {
-  shinyApp(ui = ui, server = server)
 }
 
 

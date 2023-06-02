@@ -7,5 +7,5 @@
 runNutrimeterApp()
 }
 \description{
-Run the Nutrimeter app
+Run this function to open the NutriMeter Shiny App! No arguments needed!
 }

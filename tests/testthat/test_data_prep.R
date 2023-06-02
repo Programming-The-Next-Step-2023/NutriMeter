@@ -1,6 +1,4 @@
-library(NutriMeter)
-
-test_that("prep_data() works correcly", {
+test_that("prep_data() works correctly", {
   result <- NutriMeter:::prep_data(age = 18, gender = "Female")
   expect_equal(length(unique(result$nutrient)), 24)
   expect_equal(colnames(result), c("food_name","quantity","nutrient",
